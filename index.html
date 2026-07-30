@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Client Communication Workflow System</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          serif: ['"Playfair Display"', 'serif'],
+          sans: ['Inter', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'monospace'],
+        },
+        colors: {
+          navy: {
+            50:'#f2f5f9', 100:'#dde5ee', 200:'#b9c9dc', 300:'#8ea6c2',
+            400:'#5f7fa0', 500:'#3d5f80', 600:'#2c4a66', 700:'#213a51',
+            800:'#172a3c', 900:'#0d1b28', 950:'#080f17'
+          },
+          gold: { 300:'#e5c778', 400:'#d4ac4e', 500:'#b8912f', 600:'#9a7625' },
+          emerald: { 50:'#eef5f0', 100:'#d7e8dd', 300:'#7bab8d', 500:'#3c7856', 700:'#295940' },
+          steel:   { 50:'#eef2f7', 100:'#d7e1ed', 300:'#7f9dbe', 500:'#3d6690', 700:'#294967' },
+          plum:    { 50:'#f3eef5', 100:'#ded0e4', 300:'#9c78ac', 500:'#6b4980', 700:'#4d3560' },
+          burgundy:{ 50:'#f7eeee', 100:'#ecd4d3', 300:'#bb7f7d', 500:'#8f3f3d', 700:'#6b2c2b' },
+        },
+        boxShadow: {
+          card: '0 1px 2px rgba(13,27,40,0.04), 0 8px 24px -8px rgba(13,27,40,0.10)',
+          cardHover: '0 4px 10px rgba(13,27,40,0.06), 0 16px 40px -12px rgba(13,27,40,0.18)',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { background: #f6f4ef; }
+
+  /* ── Paper texture backdrop ─────────────────────────────── */
+  .paper-bg {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(13,27,40,0.05) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+
+  /* ── Reveal-on-scroll ───────────────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+  .reveal.is-visible { opacity: 1; transform: translateY(0); }
+  .reveal-stagger > * { transition-delay: calc(var(--i, 0) * 70ms); }
+
+  /* ── Signature: the dossier seal ───────────────────────── */
+  .seal {
+    background: radial-gradient(circle at 35% 30%, #e5c778, #b8912f 60%, #9a7625 100%);
+    box-shadow: 0 0 0 3px #0d1b28, 0 0 0 5px rgba(212,172,78,0.35), 0 8px 18px -6px rgba(184,145,47,0.55);
+  }
+
+  /* ── Gold hairline divider ─────────────────────────────── */
+  .hairline { height: 1px; background: linear-gradient(90deg, transparent, rgba(184,145,47,0.55), transparent); }
+
+  /* ── Card hover lift ────────────────────────────────────── */
+  .lift { transition: transform .35s cubic-bezier(.2,.7,.2,1), box-shadow .35s cubic-bezier(.2,.7,.2,1); }
+  .lift:hover { transform: translateY(-4px); }
+
+  /* ── Automation engine pulse ────────────────────────────── */
+  .pulse-ring::before {
+    content: '';
+    position: absolute; inset: -6px;
+    border-radius: 9999px;
+    border: 1px solid rgba(212,172,78,0.45);
+    animation: pulseRing 2.6s ease-out infinite;
+  }
+  @keyframes pulseRing {
+    0% { transform: scale(0.85); opacity: .9; }
+    80% { transform: scale(1.35); opacity: 0; }
+    100% { opacity: 0; }
+  }
+
+  /* ── Flowing connector arrow ────────────────────────────── */
+  .flow-line { position: relative; width: 2px; background: linear-gradient(180deg, rgba(184,145,47,0.15), rgba(184,145,47,0.7), rgba(184,145,47,0.15)); }
+  .flow-line::after {
+    content: ''; position: absolute; left: -3px; top: -8px;
+    width: 8px; height: 8px; border-radius: 9999px; background: #d4ac4e;
+    animation: flowDot 2.4s linear infinite;
+    box-shadow: 0 0 8px 2px rgba(212,172,78,0.6);
+  }
+  @keyframes flowDot { 0% { top: -8px; opacity: 0;} 15% { opacity: 1;} 90% { opacity: 1;} 100% { top: 100%; opacity: 0;} }
+
+  /* ── Timeline draw-in ───────────────────────────────────── */
+  .timeline-track { position: relative; overflow: hidden; }
+  .timeline-fill { position: absolute; inset: 0; width: 0%; background: linear-gradient(90deg, #295940, #b8912f 55%, #6b2c2b); transition: width 1.6s cubic-bezier(.2,.7,.2,1); }
+  .timeline-fill.is-visible { width: 100%; }
+
+  .dot-pop { transform: scale(.4); opacity: 0; transition: transform .5s cubic-bezier(.34,1.56,.64,1), opacity .4s ease; }
+  .dot-pop.is-visible { transform: scale(1); opacity: 1; }
+
+  /* ── Nav underline ──────────────────────────────────────── */
+  .nav-link { position: relative; }
+  .nav-link::after {
+    content: ''; position: absolute; left: 0; bottom: -6px; width: 0; height: 2px;
+    background: #b8912f; transition: width .3s ease;
+  }
+  .nav-link:hover::after { width: 100%; }
+
+  ::selection { background: rgba(184,145,47,0.35); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .dot-pop { opacity: 1 !important; transform: none !important; transition: none !important; }
+    .pulse-ring::before, .flow-line::after { animation: none !important; }
+    .timeline-fill { transition: none !important; }
+  }
+</style>
+</head>
+<body class="text-navy-800 font-sans antialiased">
+
+  <!-- ══════════════════ HERO ══════════════════ -->
+  <header class="relative bg-gradient-to-b from-navy-950 via-navy-900 to-navy-800 text-white overflow-hidden">
+    <div class="absolute inset-0 paper-bg opacity-[0.06]"></div>
+    <div class="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-gold-500/10 blur-3xl"></div>
+    <div class="relative max-w-5xl mx-auto px-6 pt-16 pb-14 text-center">
+      <div class="inline-flex items-center gap-2 border border-gold-400/40 text-gold-300 px-4 py-1.5 rounded-full text-xs font-semibold tracking-[0.14em] uppercase mb-7">
+        <span class="w-1.5 h-1.5 rounded-full bg-gold-400"></span>
+        Personal Injury Law Firm Automation
+      </div>
+      <h1 class="font-serif text-4xl md:text-6xl font-bold leading-tight mb-5">
+        Client Communication
+        <span class="block mt-1 bg-gradient-to-r from-gold-300 to-gold-500 bg-clip-text text-transparent">Workflow System</span>
+      </h1>
+      <p class="text-navy-200 text-lg max-w-2xl mx-auto font-light">
+        A visual record of how automated correspondence is triggered at each milestone of a case
+      </p>
+      <div class="hairline w-40 mx-auto mt-9"></div>
+    </div>
+  </header>
+
+  <!-- ══════════════════ NAV ══════════════════ -->
+  <nav class="bg-[#f6f4ef]/90 backdrop-blur border-b border-navy-900/10 sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-6 py-4 flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm font-medium tracking-wide">
+      <a href="#overview" class="nav-link text-navy-600 hover:text-navy-900">Overview</a>
+      <a href="#templates" class="nav-link text-navy-600 hover:text-navy-900">Templates</a>
+      <a href="#triggers" class="nav-link text-navy-600 hover:text-navy-900">Trigger Logic</a>
+      <a href="#timeline" class="nav-link text-navy-600 hover:text-navy-900">30-Day Timeline</a>
+      <a href="#summary" class="nav-link text-navy-600 hover:text-navy-900">Summary Generation</a>
+    </div>
+  </nav>
+
+  <main class="max-w-5xl mx-auto px-6 py-20 space-y-28">
+
+    <!-- ══════════════════ 1. OVERVIEW ══════════════════ -->
+    <section id="overview" class="reveal">
+      <div class="mb-10 text-center">
+        <div class="seal inline-flex items-center justify-center w-12 h-12 rounded-full text-navy-950 text-lg font-serif font-bold mb-5">1</div>
+        <h2 class="font-serif text-3xl font-bold text-navy-900 mb-2">System Overview</h2>
+        <p class="text-navy-500">How the automation workflow operates, end to end</p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-navy-900/10 p-10 shadow-card">
+        <div class="flex flex-col items-center">
+
+          <div class="bg-steel-50 border border-steel-300 rounded-xl px-8 py-5 text-center w-full max-w-sm">
+            <div class="text-2xl mb-2">📋</div>
+            <div class="font-semibold text-steel-700 tracking-wide">NEW CASE CREATED</div>
+            <div class="text-sm text-steel-500 mt-1">Client signs retention agreement</div>
+          </div>
+
+          <div class="flow-line h-10 my-1"></div>
+
+          <div class="relative bg-navy-900 text-white rounded-2xl p-7 w-full max-w-md">
+            <div class="text-center mb-5">
+              <div class="relative inline-flex pulse-ring">
+                <div class="w-11 h-11 rounded-full bg-gold-500/20 border border-gold-400/50 flex items-center justify-center text-xl">🤖</div>
+              </div>
+              <div class="font-serif font-bold mt-3 tracking-wide">Automation Engine</div>
+            </div>
+            <div class="space-y-2 text-sm">
+              <div class="bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 flex items-center gap-3">
+                <span class="text-gold-400">✓</span> Checks days since retention
+              </div>
+              <div class="bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 flex items-center gap-3">
+                <span class="text-gold-400">✓</span> Checks document status
+              </div>
+              <div class="bg-white/5 border border-white/10 rounded-lg px-4 py-2.5 flex items-center gap-3">
+                <span class="text-gold-400">✓</span> Matches trigger conditions
+              </div>
+            </div>
+          </div>
+
+          <div class="flow-line h-10 my-1"></div>
+
+          <div class="flex flex-wrap justify-center gap-4 w-full">
+            <div class="lift bg-emerald-50 border border-emerald-300 rounded-xl px-5 py-4 text-center min-w-[150px]">
+              <div class="text-xl">👋</div>
+              <div class="text-sm font-semibold text-emerald-700 mt-1">Welcome Email</div>
+            </div>
+            <div class="lift bg-gold-500/10 border border-gold-400 rounded-xl px-5 py-4 text-center min-w-[150px]">
+              <div class="text-xl">📄</div>
+              <div class="text-sm font-semibold text-gold-600 mt-1">Document Request</div>
+            </div>
+            <div class="lift bg-steel-50 border border-steel-300 rounded-xl px-5 py-4 text-center min-w-[150px]">
+              <div class="text-xl">📊</div>
+              <div class="text-sm font-semibold text-steel-700 mt-1">Status Update</div>
+            </div>
+            <div class="lift bg-burgundy-50 border border-burgundy-300 rounded-xl px-5 py-4 text-center min-w-[150px]">
+              <div class="text-xl">⚠️</div>
+              <div class="text-sm font-semibold text-burgundy-700 mt-1">Reminder</div>
+            </div>
+          </div>
+
+          <div class="flow-line h-10 my-1"></div>
+
+          <div class="bg-emerald-50 border border-emerald-300 rounded-xl px-8 py-5 text-center w-full max-w-sm">
+            <div class="text-2xl mb-2">📧</div>
+            <div class="font-semibold text-emerald-700 tracking-wide">CLIENT RECEIVES MESSAGE</div>
+            <div class="text-sm text-emerald-600 mt-1">Personalized, timely communication</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════ 2. TEMPLATES ══════════════════ -->
+    <section id="templates" class="reveal">
+      <div class="mb-10 text-center">
+        <div class="seal inline-flex items-center justify-center w-12 h-12 rounded-full text-navy-950 text-lg font-serif font-bold mb-5">2</div>
+        <h2 class="font-serif text-3xl font-bold text-navy-900 mb-2">Five Message Templates</h2>
+        <p class="text-navy-500">Each template serves a distinct purpose in the client journey</p>
+      </div>
+
+      <div class="grid gap-5 reveal-stagger">
+        <!-- Template 1 -->
+        <article class="lift bg-emerald-50/60 border border-emerald-200 rounded-2xl p-7 shadow-card hover:shadow-cardHover">
+          <div class="flex items-start gap-5">
+            <div class="flex flex-col items-center gap-2 shrink-0">
+              <div class="bg-emerald-500 text-white w-9 h-9 rounded-full flex items-center justify-center font-serif font-bold text-sm">1</div>
+              <div class="text-2xl">👋</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-serif text-xl font-bold text-emerald-800">Welcome Message</h3>
+              <div class="text-sm text-navy-500 mt-1 mb-3"><span class="font-semibold text-navy-700">When —</span> Day 0, immediately after signing</div>
+              <p class="text-navy-700 mb-4">Build trust, set expectations, request initial documents.</p>
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Placeholder Fields</div>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Client Name]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Case Number]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Attorney Name]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Firm Phone]</span>
+                  </div>
+                </div>
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Key Points</div>
+                  <ul class="space-y-1 text-sm text-navy-600">
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Warm, reassuring tone</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Clear next steps outlined</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Contact information provided</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Template 2 -->
+        <article class="lift bg-steel-50/60 border border-steel-200 rounded-2xl p-7 shadow-card hover:shadow-cardHover">
+          <div class="flex items-start gap-5">
+            <div class="flex flex-col items-center gap-2 shrink-0">
+              <div class="bg-steel-500 text-white w-9 h-9 rounded-full flex items-center justify-center font-serif font-bold text-sm">2</div>
+              <div class="text-2xl">🚗</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-serif text-xl font-bold text-steel-700">Insurance Information Request</h3>
+              <div class="text-sm text-navy-500 mt-1 mb-3"><span class="font-semibold text-navy-700">When —</span> Day 7, if insurance info not received</div>
+              <p class="text-navy-700 mb-4">Request insurance cards and policy information.</p>
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Placeholder Fields</div>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Client Name]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Case Number]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Days Since Retention]</span>
+                  </div>
+                </div>
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Key Points</div>
+                  <ul class="space-y-1 text-sm text-navy-600">
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Explains why we need this</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Lists exactly what to send</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Offers help if client can't find docs</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Template 3 -->
+        <article class="lift bg-plum-50/60 border border-plum-200 rounded-2xl p-7 shadow-card hover:shadow-cardHover">
+          <div class="flex items-start gap-5">
+            <div class="flex flex-col items-center gap-2 shrink-0">
+              <div class="bg-plum-500 text-white w-9 h-9 rounded-full flex items-center justify-center font-serif font-bold text-sm">3</div>
+              <div class="text-2xl">👮</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-serif text-xl font-bold text-plum-700">Police Report Request</h3>
+              <div class="text-sm text-navy-500 mt-1 mb-3"><span class="font-semibold text-navy-700">When —</span> Day 14, if police report not received</div>
+              <p class="text-navy-700 mb-4">Guide the client on obtaining the police report.</p>
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Placeholder Fields</div>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Client Name]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Case Number]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Firm Phone]</span>
+                  </div>
+                </div>
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Key Points</div>
+                  <ul class="space-y-1 text-sm text-navy-600">
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Step-by-step instructions</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Multiple options provided</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Offer to obtain on client's behalf</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Template 4 -->
+        <article class="lift bg-gold-500/[0.06] border border-gold-400/40 rounded-2xl p-7 shadow-card hover:shadow-cardHover">
+          <div class="flex items-start gap-5">
+            <div class="flex flex-col items-center gap-2 shrink-0">
+              <div class="bg-gold-500 text-white w-9 h-9 rounded-full flex items-center justify-center font-serif font-bold text-sm">4</div>
+              <div class="text-2xl">📊</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-serif text-xl font-bold text-gold-600">Case Status Update</h3>
+              <div class="text-sm text-navy-500 mt-1 mb-3"><span class="font-semibold text-navy-700">When —</span> Every 2–3 weeks during active treatment</div>
+              <p class="text-navy-700 mb-4">Keep the client informed and encourage treatment compliance.</p>
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Placeholder Fields</div>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Client Name]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Case Stage]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Days Since Retention]</span>
+                  </div>
+                </div>
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Key Points</div>
+                  <ul class="space-y-1 text-sm text-navy-600">
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Current case phase explained</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Treatment reminders</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Encourages pain journaling</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Template 5 -->
+        <article class="lift bg-burgundy-50/60 border border-burgundy-200 rounded-2xl p-7 shadow-card hover:shadow-cardHover">
+          <div class="flex items-start gap-5">
+            <div class="flex flex-col items-center gap-2 shrink-0">
+              <div class="bg-burgundy-500 text-white w-9 h-9 rounded-full flex items-center justify-center font-serif font-bold text-sm">5</div>
+              <div class="text-2xl">📋</div>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h3 class="font-serif text-xl font-bold text-burgundy-700">Missing Document Reminder</h3>
+              <div class="text-sm text-navy-500 mt-1 mb-3"><span class="font-semibold text-navy-700">When —</span> Whenever specific documents are overdue</div>
+              <p class="text-navy-700 mb-4">A single consolidated reminder for all missing items.</p>
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Placeholder Fields</div>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Client Name]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Missing Document List]</span>
+                    <span class="bg-navy-50 text-navy-600 text-xs font-mono px-2 py-1 rounded">[Firm Email]</span>
+                  </div>
+                </div>
+                <div class="bg-white rounded-xl p-4 border border-navy-900/10">
+                  <div class="text-[11px] font-semibold text-navy-400 uppercase tracking-wider mb-2">Key Points</div>
+                  <ul class="space-y-1 text-sm text-navy-600">
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Lists all missing items at once</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Multiple submission methods</li>
+                    <li class="flex items-start gap-2"><span class="text-emerald-500">✓</span>Non-judgmental, helpful tone</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ══════════════════ 3. TRIGGER LOGIC ══════════════════ -->
+    <section id="triggers" class="reveal">
+      <div class="mb-10 text-center">
+        <div class="seal inline-flex items-center justify-center w-12 h-12 rounded-full text-navy-950 text-lg font-serif font-bold mb-5">3</div>
+        <h2 class="font-serif text-3xl font-bold text-navy-900 mb-2">Trigger Logic</h2>
+        <p class="text-navy-500">Decision flow for each automated message</p>
+      </div>
+
+      <div class="space-y-5">
+        <div class="bg-emerald-50/50 border border-emerald-200 rounded-2xl p-6">
+          <h4 class="font-serif font-bold text-emerald-800 mb-4">Welcome Message Trigger</h4>
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Retention Agreement Signed?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Days Since Retention = 0?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-emerald-500 text-white rounded-lg px-4 py-2 font-semibold">✓ SEND Welcome Message</span>
+          </div>
+        </div>
+
+        <div class="bg-steel-50/50 border border-steel-200 rounded-2xl p-6">
+          <h4 class="font-serif font-bold text-steel-700 mb-4">Insurance Follow-up Trigger</h4>
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Days Since Retention = 7?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Insurance Info Received = NO?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-steel-500 text-white rounded-lg px-4 py-2 font-semibold">✓ SEND Insurance Request</span>
+          </div>
+        </div>
+
+        <div class="bg-plum-50/50 border border-plum-200 rounded-2xl p-6">
+          <h4 class="font-serif font-bold text-plum-700 mb-4">Police Report Follow-up Trigger</h4>
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Days Since Retention = 14?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Police Report Received = NO?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-plum-500 text-white rounded-lg px-4 py-2 font-semibold">✓ SEND Police Report Request</span>
+          </div>
+        </div>
+
+        <div class="bg-gold-500/[0.06] border border-gold-400/40 rounded-2xl p-6">
+          <h4 class="font-serif font-bold text-gold-600 mb-4">Status Update Trigger</h4>
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Days Since Retention ≥ 14?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Last Update &gt; 14 Days Ago?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Case NOT Closed/Settled?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-gold-500 text-white rounded-lg px-4 py-2 font-semibold">✓ SEND Status Update</span>
+          </div>
+        </div>
+
+        <div class="bg-burgundy-50/50 border border-burgundy-200 rounded-2xl p-6">
+          <h4 class="font-serif font-bold text-burgundy-700 mb-4">Missing Document Reminder Trigger</h4>
+          <div class="flex flex-wrap items-center gap-2 text-sm">
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Days Since Retention ≥ 10?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Any Documents Missing?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-white border border-navy-900/15 rounded-lg px-4 py-2 font-medium"><span class="text-gold-500 mr-1">◆</span>Last Reminder &gt; 7 Days?</span>
+            <span class="text-emerald-600 font-semibold text-xs">→ YES →</span>
+            <span class="bg-burgundy-500 text-white rounded-lg px-4 py-2 font-semibold">✓ SEND Missing Doc Reminder</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bonus rules -->
+      <div class="mt-14">
+        <h3 class="font-serif text-xl font-bold text-navy-900 mb-6 flex items-center gap-3">
+          <span class="bg-gold-500 text-white px-3 py-1 rounded text-xs tracking-widest uppercase">Escalation</span>
+          Additional Rules
+        </h3>
+        <div class="grid md:grid-cols-2 gap-5">
+          <div class="lift bg-gold-500/[0.06] border border-gold-400/40 rounded-2xl p-6">
+            <div class="text-xl mb-3">⚡</div>
+            <h4 class="font-serif font-bold text-gold-600 mb-2">Authorization Escalation</h4>
+            <div class="text-sm text-navy-700 space-y-2">
+              <p><strong>If:</strong> Day 21+ AND authorizations missing AND 2+ reminders sent</p>
+              <p><strong>Then:</strong> Escalate to paralegal for a phone call</p>
+            </div>
+          </div>
+          <div class="lift bg-burgundy-50/50 border border-burgundy-300 rounded-2xl p-6">
+            <div class="text-xl mb-3">🚨</div>
+            <h4 class="font-serif font-bold text-burgundy-700 mb-2">Medical Records Final Push</h4>
+            <div class="text-sm text-navy-700 space-y-2">
+              <p><strong>If:</strong> Day 30+ AND medical records missing</p>
+              <p><strong>Then:</strong> Flag for attorney review, contact provider directly</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════ 4. TIMELINE ══════════════════ -->
+    <section id="timeline" class="reveal">
+      <div class="mb-10 text-center">
+        <div class="seal inline-flex items-center justify-center w-12 h-12 rounded-full text-navy-950 text-lg font-serif font-bold mb-5">4</div>
+        <h2 class="font-serif text-3xl font-bold text-navy-900 mb-2">30-Day Timeline Example</h2>
+        <p class="text-navy-500">A sample case showing exactly when each message fires</p>
+      </div>
+
+      <div class="bg-navy-900 text-white rounded-2xl p-7 mb-8">
+        <div class="flex flex-wrap items-center gap-6">
+          <div class="flex items-center gap-3">
+            <div class="w-11 h-11 seal rounded-full flex items-center justify-center text-lg">👩</div>
+            <div>
+              <div class="font-semibold">Maria Gonzalez</div>
+              <div class="text-navy-300 text-xs uppercase tracking-wide">Client</div>
+            </div>
+          </div>
+          <div class="h-8 w-px bg-white/15 hidden md:block"></div>
+          <div><div class="text-navy-400 text-[11px] uppercase tracking-wider">Case Number</div><div class="font-mono text-gold-300">PI-2026-04182</div></div>
+          <div class="h-8 w-px bg-white/15 hidden md:block"></div>
+          <div><div class="text-navy-400 text-[11px] uppercase tracking-wider">Incident</div><div>Rear-end collision</div></div>
+          <div class="h-8 w-px bg-white/15 hidden md:block"></div>
+          <div><div class="text-navy-400 text-[11px] uppercase tracking-wider">Attorney</div><div>Sarah Mitchell</div></div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-navy-900/10 p-8 overflow-x-auto shadow-card">
+        <div class="min-w-[820px]">
+          <div class="relative">
+            <div class="timeline-track absolute top-6 left-0 right-0 h-1.5 bg-navy-100 rounded-full">
+              <div class="timeline-fill rounded-full" id="timelineFill"></div>
+            </div>
+            <div class="relative flex justify-between">
+              <div class="flex flex-col items-center dot-pop" style="transition-delay:0ms">
+                <div class="w-11 h-11 bg-emerald-500 rounded-full flex items-center justify-center text-lg shadow-lg border-4 border-white relative z-10">👋</div>
+                <div class="mt-3 text-xs font-semibold text-navy-700 text-center max-w-20">Welcome</div>
+              </div>
+              <div class="flex flex-col items-center dot-pop" style="transition-delay:150ms">
+                <div class="w-11 h-11 bg-steel-500 rounded-full flex items-center justify-center text-lg shadow-lg border-4 border-white relative z-10">🚗</div>
+                <div class="mt-3 text-xs font-semibold text-navy-700 text-center max-w-20">Insurance Request</div>
+              </div>
+              <div class="flex flex-col items-center dot-pop" style="transition-delay:300ms">
+                <div class="w-11 h-11 bg-burgundy-500 rounded-full flex items-center justify-center text-lg shadow-lg border-4 border-white relative z-10">📋</div>
+                <div class="mt-3 text-xs font-semibold text-navy-700 text-center max-w-20">Missing Docs</div>
+              </div>
+              <div class="flex flex-col items-center dot-pop" style="transition-delay:450ms">
+                <div class="w-11 h-11 bg-plum-500 rounded-full flex items-center justify-center text-lg shadow-lg border-4 border-white relative z-10">👮</div>
+                <div class="mt-3 text-xs font-semibold text-navy-700 text-center max-w-20">Police Report</div>
+              </div>
+              <div class="flex flex-col items-center dot-pop" style="transition-delay:600ms">
+                <div class="w-11 h-11 bg-gold-500 rounded-full flex items-center justify-center text-lg shadow-lg border-4 border-white relative z-10">📊</div>
+                <div class="mt-3 text-xs font-semibold text-navy-700 text-center max-w-20">Status Update</div>
+              </div>
+              <div class="flex flex-col items-center dot-pop" style="transition-delay:750ms">
+                <div class="w-11 h-11 bg-burgundy-700 rounded-full flex items-center justify-center text-lg shadow-lg border-4 border-white relative z-10">🚨</div>
+                <div class="mt-3 text-xs font-semibold text-navy-700 text-center max-w-20">Escalation</div>
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-between mt-4 text-sm text-navy-400 font-mono">
+            <span>Day 0</span><span>Day 7</span><span>Day 10</span><span>Day 14</span><span>Day 21</span><span>Day 30</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-8 space-y-3">
+        <div class="bg-emerald-50/50 border border-emerald-200 rounded-xl p-5">
+          <div class="flex flex-wrap items-start gap-4">
+            <div class="bg-emerald-500 text-white px-3 py-1 rounded-lg font-semibold text-sm shrink-0">Day 0</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1.5"><h4 class="font-serif font-bold text-navy-900">Welcome Message Sent</h4><span class="text-navy-400 text-sm">· April 18, 2026</span></div>
+              <p class="text-sm text-navy-600 mb-3"><span class="font-semibold">Trigger:</span> Retention agreement signed → triggers immediate welcome</p>
+              <div class="flex flex-wrap gap-2">
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Insurance</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Police</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Auth</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Medical</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-steel-50/50 border border-steel-200 rounded-xl p-5">
+          <div class="flex flex-wrap items-start gap-4">
+            <div class="bg-steel-500 text-white px-3 py-1 rounded-lg font-semibold text-sm shrink-0">Day 7</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1.5"><h4 class="font-serif font-bold text-navy-900">Insurance Follow-up Sent</h4><span class="text-navy-400 text-sm">· April 25, 2026</span></div>
+              <p class="text-sm text-navy-600 mb-3"><span class="font-semibold">Trigger:</span> Day 7 reached, insurance info still missing</p>
+              <div class="flex flex-wrap gap-2">
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Insurance</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Police</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Auth</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Medical</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-gold-500/[0.06] border border-gold-400/40 rounded-xl p-5">
+          <div class="flex flex-wrap items-start gap-4">
+            <div class="bg-gold-500 text-white px-3 py-1 rounded-lg font-semibold text-sm shrink-0">Day 21</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1.5"><h4 class="font-serif font-bold text-navy-900">Case Status Update Sent</h4><span class="text-navy-400 text-sm">· May 9, 2026</span></div>
+              <p class="text-sm text-navy-600 mb-3"><span class="font-semibold">Trigger:</span> Periodic update, roughly every two weeks during treatment</p>
+              <div class="flex flex-wrap gap-2">
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">✓ Insurance</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">✓ Police</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Auth</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Medical</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-burgundy-50/50 border border-burgundy-200 rounded-xl p-5">
+          <div class="flex flex-wrap items-start gap-4">
+            <div class="bg-burgundy-500 text-white px-3 py-1 rounded-lg font-semibold text-sm shrink-0">Day 30</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2 mb-1.5"><h4 class="font-serif font-bold text-navy-900">Escalation + Final Reminder</h4><span class="text-navy-400 text-sm">· May 18, 2026</span></div>
+              <p class="text-sm text-navy-600 mb-3"><span class="font-semibold">Trigger:</span> Day 30 reached, medical records still missing → flagged for attorney</p>
+              <div class="flex flex-wrap gap-2">
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">✓ Insurance</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">✓ Police</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 border border-emerald-200">✓ Auth</span>
+                <span class="text-xs px-2 py-1 rounded-full font-medium bg-burgundy-100 text-burgundy-700 border border-burgundy-200">✗ Medical</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════ 5. SUMMARY GENERATION ══════════════════ -->
+    <section id="summary" class="reveal">
+      <div class="mb-10 text-center">
+        <div class="seal inline-flex items-center justify-center w-12 h-12 rounded-full text-navy-950 text-lg font-serif font-bold mb-5">5</div>
+        <h2 class="font-serif text-3xl font-bold text-navy-900 mb-2">Case Summary Generation</h2>
+        <p class="text-navy-500">How AI produces professional summaries from raw notes</p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-navy-900/10 p-8 mb-8 shadow-card">
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+          <div class="bg-burgundy-50/60 border border-burgundy-300 rounded-xl p-5 w-full md:w-64 text-center">
+            <div class="text-2xl mb-2">📝</div>
+            <div class="font-semibold text-burgundy-700">Raw Case Notes</div>
+            <div class="text-xs text-burgundy-500 mt-2">Messy, abbreviated, informal</div>
+          </div>
+          <div class="text-3xl text-gold-500 rotate-90 md:rotate-0">→</div>
+          <div class="bg-navy-900 text-white rounded-xl p-5 w-full md:w-48 text-center">
+            <div class="text-2xl mb-2">🤖</div>
+            <div class="font-semibold">AI Processing</div>
+            <div class="text-xs text-navy-300 mt-2">Claude analyzes &amp; structures</div>
+          </div>
+          <div class="text-3xl text-gold-500 rotate-90 md:rotate-0">→</div>
+          <div class="bg-emerald-50/60 border border-emerald-300 rounded-xl p-5 w-full md:w-64 text-center">
+            <div class="text-2xl mb-2">✅</div>
+            <div class="font-semibold text-emerald-700">Professional Summary</div>
+            <div class="text-xs text-emerald-600 mt-2">Clear, complete, client-ready</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-5">
+        <div class="bg-white rounded-2xl border border-navy-900/10 overflow-hidden shadow-card">
+          <div class="bg-burgundy-500 text-white px-6 py-3 font-semibold flex items-center gap-2 text-sm tracking-wide"><span>📥</span> INPUT — Raw Case Notes</div>
+          <div class="p-6">
+            <div class="bg-burgundy-50/50 border border-burgundy-200 rounded-xl p-4 font-mono text-sm text-navy-700 leading-relaxed">
+              "Client rear-ended on I-95, 3/15/26. Soft tissue injury, ongoing PT 2x/week. Insurance adjuster assigned, no offer yet. Police report received 3/28. Awaiting final medical records from PT clinic. Client anxious about timeline, called twice this week."
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-navy-900/10 overflow-hidden shadow-card">
+          <div class="bg-emerald-500 text-white px-6 py-3 font-semibold flex items-center gap-2 text-sm tracking-wide"><span>📤</span> OUTPUT — Professional Summary</div>
+          <div class="p-6">
+            <div class="bg-emerald-50/50 border border-emerald-200 rounded-xl p-4 text-sm text-navy-700 leading-relaxed">
+              The client was involved in a rear-end motor vehicle collision on I-95 on March 15, 2026, sustaining soft tissue injuries requiring ongoing physical therapy twice per week. The police report was obtained on March 28, 2026, and an insurance adjuster has been assigned, though no settlement offer has been extended. We are awaiting final medical records from the treating PT clinic. The client has expressed concern about the timeline and has contacted the office twice this week — a courtesy call is recommended within 24 hours to manage expectations.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-8 bg-navy-900 rounded-2xl p-7 text-white">
+        <h4 class="font-serif font-bold mb-4 flex items-center gap-2 text-gold-300"><span class="text-lg">📋</span> Attorney Prompt Template</h4>
+        <div class="bg-white/5 border border-white/10 rounded-xl p-4 font-mono text-sm text-navy-100 whitespace-pre-wrap leading-relaxed">You are a legal case assistant. Given these raw case notes,
+generate a professional one-paragraph summary including:
+
+1. Incident type and date
+2. Current injury status and treatment
+3. Document status (police report, medical records, insurance)
+4. Pending items or concerns
+5. Recommended next steps
+
+RAW NOTES: [PASTE HERE]</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ══════════════════ FOOTER ══════════════════ -->
+  <footer class="bg-navy-950 text-navy-400 py-10 text-center border-t border-white/5">
+    <div class="hairline w-24 mx-auto mb-5"></div>
+    <p class="text-sm font-serif tracking-wide">Client Communication Workflow System — Visual Documentation</p>
+    <p class="text-xs mt-1 text-navy-600">Personal Injury Law Firm Automation Prototype</p>
+  </footer>
+
+<script>
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('is-visible'); });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal, .timeline-track, .dot-pop').forEach(el => io.observe(el));
+
+  document.querySelectorAll('.reveal-stagger > *').forEach((el, i) => el.style.setProperty('--i', i));
+</script>
+</body>
+</html>
